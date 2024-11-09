@@ -1,0 +1,9 @@
+version: '3.7'
+
+services:
+  whatsapp-bot:
+    build: .
+    container_name: whatsapp-bot
+    restart: always
+
+
