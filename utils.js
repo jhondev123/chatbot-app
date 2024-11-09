@@ -20,10 +20,15 @@ function getContactData(msg){
 function verifyKeyWordIsValid(msg){
     return msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola)/i);
 }
+function isValidCPF(cpf){
+   return true;
+}
 
 module.exports = {
     verifyMessageIsValidContact,
     verifyMessageIsValidGroup,
     verifyKeyWordIsValid,
-    simulatingTyping
+    simulatingTyping,
+    isValidCPF,
+    getContactData
 };

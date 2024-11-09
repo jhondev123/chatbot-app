@@ -4,9 +4,10 @@ const { Client } = require('whatsapp-web.js');
 const {
     verifyMessageIsValidContact,
     simulatingTyping,
-    verifyKeyWordIsValid
+    verifyKeyWordIsValid,
+    getContactData,
+    isValidCPF
 } = require('./utils.js');
-
 
 const client = new Client({
     puppeteer: {
@@ -15,8 +16,9 @@ const client = new Client({
 });
 
 client.on('qr', qr => {
-    qrcode.generate(qr, {small: true});
+    qrcode.generate(qr, { small: true });
 });
+
 client.on('ready', () => {
     console.log('WhatsApp conectado.');
 });
@@ -25,14 +27,19 @@ client.initialize();
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+const userState = {};
+
+
 client.on('message', async msg => {
+    const chat = await msg.getChat();
+    const userId = msg.from;
 
-     if (verifyKeyWordIsValid(msg) && verifyMessageIsValidContact(msg)) {
+    if (!userState[userId]) {
+        userState[userId] = { step: 'initial' };
+    }
 
-        const chat = await msg.getChat();
-
+    if (verifyKeyWordIsValid(msg) && verifyMessageIsValidContact(msg) && userState[userId].step === 'initial') {
         await simulatingTyping(chat, delay);
-
         await client.sendMessage(
             msg.from,
             `
@@ -40,31 +47,37 @@ client.on('message', async msg => {
                 1 - Problemas com Certificado\n
                 5 - Falar Conosco\n
             `
-        ); 
-        
-         await simulatingTyping(chat, delay);
+        );
+        await simulatingTyping(chat, delay);
+    }
 
-     }
-
-    if (msg.body !== null && msg.body === '1' && verifyMessageIsValidContact(msg)) {
-        const chat = await msg.getChat();
-
-
+    if (msg.body === '1' && verifyMessageIsValidContact(msg)) {
+        userState[userId].step = 'requestingInfo';
         await simulatingTyping(chat, delay);
         await client.sendMessage(msg.from, 'Nos informe seu Nome e CPF para que possamos verificar seu cadastro.');
-
-
     }
 
+    if (userState[userId].step === 'requestingInfo' && verifyMessageIsValidContact(msg)) {
+        const userMessage = msg.body.trim().split(' ');
 
+        if (userMessage.length >= 2) {
+            const cpf = userMessage.pop();
+            const nome = userMessage.join(' ');
 
-    if (msg.body !== null && msg.body === '5' && verifyMessageIsValidContact(msg)) {
-        const chat = await msg.getChat();
+            if (isValidCPF(cpf)) {
+                userState[userId] = { step: 'initial' };
+                await simulatingTyping(chat, delay);
+                await client.sendMessage(msg.from, `Obrigado, ${nome}. Verificamos seu cadastro com o CPF: ${cpf}. Em breve retornaremos com mais informações.`);
+            } else {
+                await client.sendMessage(msg.from, 'CPF inválido. Por favor, insira novamente seu nome e CPF (11 dígitos).');
+            }
+        } else {
+            await client.sendMessage(msg.from, 'Por favor, envie seu Nome e CPF (11 dígitos), separados por um espaço.');
+        }
+    }
 
+    if (msg.body === '5' && verifyMessageIsValidContact(msg)) {
         await simulatingTyping(chat, delay);
-        await client.sendMessage(msg.from, 'Se você tiver outras dúvidas ou precisar de mais informações, por favor, fale aqui nesse whatsapp ou visite nosso site ');
-
-
+        await client.sendMessage(msg.from, 'Se você tiver outras dúvidas ou precisar de mais informações, por favor, fale aqui nesse WhatsApp ou visite nosso site.');
     }
-
 });
